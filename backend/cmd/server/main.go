@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/xpunisherxx/collegesathi/internal/habits"
 	"github.com/xpunisherxx/collegesathi/internal/tasks"
 )
 
@@ -82,6 +83,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", healthHandler)
 	tasks.NewHandler(store).Register(mux)
+	habits.NewHandler(habits.NewStore(pool)).Register(mux)
 
 	// Serve the dashboard from the same server, so the frontend and the API
 	// share one origin (no CORS needed). Run the server from backend/.

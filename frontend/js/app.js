@@ -17,35 +17,40 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ---------- Storage ----------
-// The ONLY place that knows where tasks are saved. In Phase 3 you will
-// replace the body of these two functions with fetch() calls to the Go API;
-// nothing else in this file needs to change.
-const STORAGE_KEY = "collegesathi.tasks";
+// ---------- API ----------
+// The ONLY place that talks to the Go server. Every function returns a
+// promise: the parsed JSON, or null for "204 No Content".
+const api = {
+  async request(path, options = {}) {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (response.status === 204) return null;
 
-const DEFAULT_TASKS = [
-  { id: 1, title: "Review economics lecture notes", meta: "Study · 45 min", priority: "high", done: false },
-  { id: 2, title: "Submit design research brief", meta: "College · Due 4:00 PM", priority: "high", done: false },
-  { id: 3, title: "Evening walk around campus", meta: "Health · 30 min", priority: "gentle", done: true },
-  { id: 4, title: "Read 20 pages of Meditations", meta: "Personal · 25 min", priority: "medium", done: false },
-];
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
+  },
 
-function loadTasks() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return Array.isArray(saved) ? saved : DEFAULT_TASKS;
-  } catch {
-    return DEFAULT_TASKS;
-  }
-}
-
-function saveTasks(list) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-}
+  listTasks() {
+    return this.request("/api/tasks");
+  },
+  createTask(title, priority) {
+    return this.request("/api/tasks", { method: "POST", body: JSON.stringify({ title, priority }) });
+  },
+  setTaskDone(id, done) {
+    return this.request(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify({ done }) });
+  },
+  deleteTask(id) {
+    return this.request(`/api/tasks/${id}`, { method: "DELETE" });
+  },
+};
 
 // ---------- State ----------
 const state = {
-  tasks: loadTasks(),
+  tasks: [],
+  taskError: "",
   habits: [
     { name: "Deep study", streak: 12, pct: 86 },
     { name: "Morning rise", streak: 8, pct: 72 },
@@ -54,25 +59,29 @@ const state = {
   weekHours: [2.0, 2.8, 2.2, 3.4, 2.5, 4.0, 1.8], // Mon..Sun
 };
 
-// ---------- Task logic (pure data changes, no DOM) ----------
-function nextTaskId() {
-  return state.tasks.reduce((max, t) => Math.max(max, t.id), 0) + 1;
+// ---------- Task logic ----------
+// The server is the single source of truth: after every change we reload
+// the list from it instead of patching our own copy.
+async function refreshTasks() {
+  try {
+    state.tasks = await api.listTasks();
+  } catch (error) {
+    state.taskError = "Could not load tasks. Is the server running?";
+    console.error(error);
+  }
+  renderTasks();
 }
 
-function addTask(title, priority) {
-  state.tasks.push({ id: nextTaskId(), title, meta: "Added today", priority, done: false });
-  saveTasks(state.tasks);
-}
-
-function toggleTask(id) {
-  const task = state.tasks.find((t) => t.id === id);
-  if (task) task.done = !task.done;
-  saveTasks(state.tasks);
-}
-
-function deleteTask(id) {
-  state.tasks = state.tasks.filter((t) => t.id !== id);
-  saveTasks(state.tasks);
+/** Runs one API call, remembers its error (if any), then reloads the list. */
+async function runTaskAction(action) {
+  state.taskError = "";
+  try {
+    await action();
+  } catch (error) {
+    state.taskError = error.message;
+    console.error(error);
+  }
+  await refreshTasks();
 }
 
 // ---------- Rendering ----------
@@ -102,20 +111,23 @@ function renderCalendar(now) {
 }
 
 function renderTasks() {
-  const { tasks } = state;
+  const { tasks, taskError } = state;
 
-  $("#task-list").innerHTML = tasks.length
+  const errorRow = taskError ? `<li class="empty">${escapeHtml(taskError)}</li>` : "";
+  const taskRows = tasks.length
     ? tasks.map((t) => `
-        <li class="${t.done ? "done" : ""}">
-          <button class="check" data-action="toggle" data-id="${t.id}" aria-label="Toggle: ${escapeHtml(t.title)}">${t.done ? "✓" : ""}</button>
-          <div class="t-body">
-            <div class="t-title">${escapeHtml(t.title)}</div>
-            <div class="muted small">${escapeHtml(t.meta)}</div>
-          </div>
-          <span class="tag ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>
-          <button class="del" data-action="delete" data-id="${t.id}" aria-label="Delete: ${escapeHtml(t.title)}">×</button>
-        </li>`).join("")
+      <li class="${t.done ? "done" : ""}">
+        <button class="check" data-action="toggle" data-id="${t.id}" aria-label="Toggle: ${escapeHtml(t.title)}">${t.done ? "✓" : ""}</button>
+        <div class="t-body">
+          <div class="t-title">${escapeHtml(t.title)}</div>
+          <div class="muted small">${escapeHtml(t.meta)}</div>
+        </div>
+        <span class="tag ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>
+        <button class="del" data-action="delete" data-id="${t.id}" aria-label="Delete: ${escapeHtml(t.title)}">×</button>
+      </li>`).join("")
     : '<li class="empty">Nothing on your agenda. Add your first task below.</li>';
+
+  $("#task-list").innerHTML = errorRow + taskRows;
 
   const remaining = tasks.filter((t) => !t.done).length;
   $("#stat-tasks").textContent = remaining;
@@ -145,10 +157,10 @@ $("#task-form").addEventListener("submit", (event) => {
   const title = input.value.trim();
   if (!title) return; // ignore empty / whitespace-only titles
 
-  addTask(title, $("#new-task-priority").value);
+  const priority = $("#new-task-priority").value;
   input.value = "";
   input.focus();
-  renderTasks();
+  runTaskAction(() => api.createTask(title, priority));
 });
 
 // One listener on the list (event delegation) handles every button inside it,
@@ -158,9 +170,13 @@ $("#task-list").addEventListener("click", (event) => {
   if (!button) return;
 
   const id = Number(button.dataset.id);
-  if (button.dataset.action === "toggle") toggleTask(id);
-  if (button.dataset.action === "delete") deleteTask(id);
-  renderTasks();
+  if (button.dataset.action === "toggle") {
+    const task = state.tasks.find((t) => t.id === id);
+    if (task) runTaskAction(() => api.setTaskDone(id, !task.done));
+  }
+  if (button.dataset.action === "delete") {
+    runTaskAction(() => api.deleteTask(id));
+  }
 });
 
 // ---------- Focus timer ----------
@@ -202,7 +218,7 @@ $("#reset").addEventListener("click", () => {
 const now = new Date();
 renderHeader(now);
 renderCalendar(now);
-renderTasks();
+refreshTasks();
 renderHabits();
 renderWeekBars();
 renderTimer();

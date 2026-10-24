@@ -45,17 +45,24 @@ const api = {
   deleteTask(id) {
     return this.request(`/api/tasks/${id}`, { method: "DELETE" });
   },
+
+  listHabits() {
+    return this.request("/api/habits");
+  },
+  createHabit(name) {
+    return this.request("/api/habits", { method: "POST", body: JSON.stringify({ name }) });
+  },
+  setHabitDone(id, done) {
+    return this.request(`/api/habits/${id}`, { method: "PATCH", body: JSON.stringify({ done }) });
+  },
 };
 
 // ---------- State ----------
 const state = {
   tasks: [],
   taskError: "",
-  habits: [
-    { name: "Deep study", streak: 12, pct: 86 },
-    { name: "Morning rise", streak: 8, pct: 72 },
-    { name: "Daily movement", streak: 5, pct: 64 },
-  ],
+  habits: [],
+  habitError: "",
   weekHours: [2.0, 2.8, 2.2, 3.4, 2.5, 4.0, 1.8], // Mon..Sun
 };
 
@@ -82,6 +89,28 @@ async function runTaskAction(action) {
     console.error(error);
   }
   await refreshTasks();
+}
+
+// ---------- Habit logic (same pattern as tasks) ----------
+async function refreshHabits() {
+  try {
+    state.habits = await api.listHabits();
+  } catch (error) {
+    state.habitError = "Could not load habits. Is the server running?";
+    console.error(error);
+  }
+  renderHabits();
+}
+
+async function runHabitAction(action) {
+  state.habitError = "";
+  try {
+    await action();
+  } catch (error) {
+    state.habitError = error.message;
+    console.error(error);
+  }
+  await refreshHabits();
 }
 
 // ---------- Rendering ----------
@@ -135,11 +164,20 @@ function renderTasks() {
 }
 
 function renderHabits() {
-  $("#habit-list").innerHTML = state.habits.map((h) => `
-    <li>
-      <div class="h-top"><span>${h.name}</span><span class="muted small">${h.streak} days · ${h.pct}%</span></div>
-      <div class="track"><span style="width:${h.pct}%"></span></div>
-    </li>`).join("");
+  const { habits, habitError } = state;
+
+  const errorRow = habitError ? `<li class="empty">${escapeHtml(habitError)}</li>` : "";
+  const habitRows = habits.length
+    ? habits.map((h) => `
+      <li>
+        <div class="h-top">
+          <span><button class="check" data-action="tick" data-id="${h.id}" aria-label="Toggle today: ${escapeHtml(h.name)}">${h.doneToday ? "✓" : ""}</button> ${escapeHtml(h.name)}</span>
+          <span class="muted small">${h.streak} ${h.streak === 1 ? "day" : "days"}</span>
+        </div>
+      </li>`).join("")
+    : '<li class="empty">No habits yet. Click "Add habit" to create one.</li>';
+
+  $("#habit-list").innerHTML = errorRow + habitRows;
 }
 
 function renderWeekBars() {
@@ -177,6 +215,24 @@ $("#task-list").addEventListener("click", (event) => {
   if (button.dataset.action === "delete") {
     runTaskAction(() => api.deleteTask(id));
   }
+});
+
+// ---------- Habit events ----------
+// A simple prompt for now; a proper inline form can replace it later.
+$("#add-habit").addEventListener("click", (event) => {
+  event.preventDefault(); // the link has href="#"
+  const name = (window.prompt("Name your new habit:") || "").trim();
+  if (!name) return;
+  runHabitAction(() => api.createHabit(name));
+});
+
+$("#habit-list").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action='tick']");
+  if (!button) return;
+
+  const id = Number(button.dataset.id);
+  const habit = state.habits.find((h) => h.id === id);
+  if (habit) runHabitAction(() => api.setHabitDone(id, !habit.doneToday));
 });
 
 // ---------- Focus timer ----------
@@ -219,6 +275,6 @@ const now = new Date();
 renderHeader(now);
 renderCalendar(now);
 refreshTasks();
-renderHabits();
+refreshHabits();
 renderWeekBars();
 renderTimer();

@@ -1,67 +1,87 @@
 package tasks
 
-import "sync"
+import (
+	"context"
+	"errors"
+	"fmt"
 
-// Store keeps tasks in memory. It is the only place that knows how tasks
-// are stored: in Phase 4 you replace its insides with SQLite and the HTTP
-// handler code does not change.
-//
-// The mutex matters: Go serves each request in its own goroutine, so two
-// requests can touch the slice at the same time.
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// ErrNotFound is returned when no task has the requested id.
+var ErrNotFound = errors.New("task not found")
+
+// Store keeps tasks in PostgreSQL. It is the only place that knows how
+// tasks are stored, so the handler code barely changes.
 type Store struct {
-	mu     sync.Mutex
-	tasks  []Task
-	nextID int
+	db *pgxpool.Pool
 }
 
-func NewStore() *Store {
-	return &Store{nextID: 1}
+func NewStore(db *pgxpool.Pool) *Store {
+	return &Store{db: db}
 }
 
-// List returns a copy so callers cannot modify the store's data.
-func (s *Store) List() []Task {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	out := make([]Task, len(s.tasks))
-	copy(out, s.tasks)
-	return out
-}
-
-func (s *Store) Add(title, meta, priority string) Task {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	t := Task{ID: s.nextID, Title: title, Meta: meta, Priority: priority}
-	s.nextID++
-	s.tasks = append(s.tasks, t)
-	return t
-}
-
-// SetDone reports false if no task has that id.
-func (s *Store) SetDone(id int, done bool) (Task, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i := range s.tasks {
-		if s.tasks[i].ID == id {
-			s.tasks[i].Done = done
-			return s.tasks[i], true
-		}
+func (s *Store) List(ctx context.Context) ([]Task, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, title, meta, priority, done FROM tasks ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("list tasks: %w", err)
 	}
-	return Task{}, false
+	defer rows.Close()
+
+	tasks := []Task{}
+	for rows.Next() {
+		var t Task
+		if err := rows.Scan(&t.ID, &t.Title, &t.Meta, &t.Priority, &t.Done); err != nil {
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+		tasks = append(tasks, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list tasks: %w", err)
+	}
+	return tasks, nil
 }
 
-// Delete reports false if no task has that id.
-func (s *Store) Delete(id int) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for i, t := range s.tasks {
-		if t.ID == id {
-			s.tasks = append(s.tasks[:i], s.tasks[i+1:]...)
-			return true
-		}
+func (s *Store) Add(ctx context.Context, title, meta, priority string) (Task, error) {
+	var t Task
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO tasks (title, meta, priority) VALUES ($1, $2, $3)
+         RETURNING id, title, meta, priority, done`,
+		title, meta, priority,
+	).Scan(&t.ID, &t.Title, &t.Meta, &t.Priority, &t.Done)
+	if err != nil {
+		return Task{}, fmt.Errorf("add task: %w", err)
 	}
-	return false
+	return t, nil
+}
+
+// SetDone returns ErrNotFound if no task has that id.
+func (s *Store) SetDone(ctx context.Context, id int, done bool) (Task, error) {
+	var t Task
+	err := s.db.QueryRow(ctx,
+		`UPDATE tasks SET done = $2 WHERE id = $1
+         RETURNING id, title, meta, priority, done`,
+		id, done,
+	).Scan(&t.ID, &t.Title, &t.Meta, &t.Priority, &t.Done)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Task{}, ErrNotFound
+	}
+	if err != nil {
+		return Task{}, fmt.Errorf("set done: %w", err)
+	}
+	return t, nil
+}
+
+// Delete returns ErrNotFound if no task has that id.
+func (s *Store) Delete(ctx context.Context, id int) error {
+	tag, err := s.db.Exec(ctx, `DELETE FROM tasks WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete task: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

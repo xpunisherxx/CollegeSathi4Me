@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -31,7 +32,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, h.store.List())
+	items, err := h.store.List(r.Context())
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
 }
 
 type createRequest struct {
@@ -64,7 +70,11 @@ func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task := h.store.Add(title, "Added today", priority)
+	task, err := h.store.Add(r.Context(), title, "Added today", priority)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusCreated, task)
 }
 
@@ -88,9 +98,9 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, found := h.store.SetDone(id, *req.Done)
-	if !found {
-		writeError(w, http.StatusNotFound, "task not found")
+	task, err := h.store.SetDone(r.Context(), id, *req.Done)
+	if err != nil {
+		writeStoreError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, task)
@@ -101,8 +111,8 @@ func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !h.store.Delete(id) {
-		writeError(w, http.StatusNotFound, "task not found")
+	if err := h.store.Delete(r.Context(), id); err != nil {
+		writeStoreError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -128,6 +138,17 @@ func decodeBody(w http.ResponseWriter, r *http.Request, dst any) bool {
 		return false
 	}
 	return true
+}
+
+// writeStoreError maps a store error to an HTTP reply: 404 for a missing
+// task, 500 (logged, details hidden from the client) for anything else.
+func writeStoreError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrNotFound) {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	log.Printf("store: %v", err)
+	writeError(w, http.StatusInternalServerError, "internal error")
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

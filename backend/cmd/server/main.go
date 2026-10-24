@@ -1,15 +1,26 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
-	// Replace with the `module` line in backend/go.mod, plus /internal/tasks
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/xpunisherxx/collegesathi/internal/tasks"
 )
 
-const addr = ":8080"
+const (
+	addr = ":8080"
+
+	// Local development default only. In Docker or Kubernetes you will set
+	// the DATABASE_URL environment variable instead.
+	defaultDatabaseURL = "postgres://collegesathi:devpassword@localhost:5432/collegesathi"
+)
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -18,18 +29,55 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// seedTasks gives the in-memory store the same sample data the dashboard had.
-func seedTasks(store *tasks.Store) {
-	store.Add("Review economics lecture notes", "Study · 45 min", "high")
-	store.Add("Submit design research brief", "College · Due 4:00 PM", "high")
-	store.Add("Evening walk around campus", "Health · 30 min", "gentle")
-	store.Add("Read 20 pages of Meditations", "Personal · 25 min", "medium")
-	store.SetDone(3, true)
+func databaseURL() string {
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		return url
+	}
+	return defaultDatabaseURL
+}
+
+// connectDB opens a connection pool and checks the database really answers.
+func connectDB(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("create pool: %w", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+	return pool, nil
+}
+
+// seedTasks adds the sample task only when the table is empty.
+func seedTasks(ctx context.Context, store *tasks.Store) error {
+	existing, err := store.List(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: list tasks: %w", err)
+	}
+	if len(existing) > 0 {
+		return nil
+	}
+	if _, err := store.Add(ctx, "Enter your tasks here cheeky boi!", "", "medium"); err != nil {
+		return fmt.Errorf("seed: add task: %w", err)
+	}
+	return nil
 }
 
 func main() {
-	store := tasks.NewStore()
-	seedTasks(store)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := connectDB(ctx, databaseURL())
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
+	defer pool.Close()
+
+	store := tasks.NewStore(pool)
+	if err := seedTasks(ctx, store); err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", healthHandler)

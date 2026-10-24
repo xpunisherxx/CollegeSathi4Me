@@ -87,6 +87,8 @@ func main() {
 
 	// Serve the dashboard from the same server, so the frontend and the API
 	// share one origin (no CORS needed). Run the server from backend/.
+	
+	mux.Handle("GET /{$}", http.RedirectHandler("/HTML/", http.StatusFound))
 	mux.Handle("GET /", http.FileServer(http.Dir("../frontend")))
 
 	log.Printf("server listening on %s", addr)

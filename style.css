@@ -1,8 +1,19 @@
-@import url("https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/css/bootstrap.min.css");
-body {
-  background: #0c0c1d;   
-  color: #fff;
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
+
+ 
+
+body{
+    display: flex;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0c0c1d;
+    color: #fff;
+    display: flex;
+    min-height: 100vh;
+} 
 
 body::before {
   content: "";
@@ -20,4 +31,107 @@ body::after {
   inset: 0;
   z-index: -1;
   background: rgba(10, 12, 30, 0.45);
+}
+
+
+
+
+
+/* this contain the css for naivgation bar */
+.navigation{
+   width: 15%;
+  min-height: 100vh;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.page-title:hover{
+  color: blueviolet;
+}
+
+
+.logo-img {
+  height: 3.5rem;
+}
+
+.navigation .title-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.navigation ul {
+  list-style: none;
+}
+
+/* best thing , it selects the last lis in the nav bar  */
+.navigation ul:last-of-type {
+  margin-top: auto;      
+}
+
+.navigation .profile-image {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+
+.navigation a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration:none;
+  font-size: larger;
+  font-weight: 400;
+  transition: background 0.2s;
+}
+
+.navigation a:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: blueviolet;
+}
+
+.navigation a.active {
+  background: linear-gradient(135deg, rgba(90, 160, 255, 0.6), rgba(90, 160, 255, 0.2));
+  color: #fff;
+  box-shadow: 0 0 20px rgba(90, 160, 255, 0.4);
+}
+
+.navigation a.active {
+  background: linear-gradient(135deg, rgba(90, 160, 255, 0.6), rgba(123, 0, 255, 0.2));
+  color: #fff;
+  box-shadow: 0 0 20px rgba(90, 160, 255, 0.4);
+}
+
+.navigation svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
+
+
+
+
+
+/* this is where main begins */
+
+
+main {
+  flex: 1;
+  padding: 24px 32px;
 }

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>College Sathi</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<!--navigavtion bar is located here  -->
+
+  <nav class="navigation">
+
+    <div class="page-title">
+    <a href="#"><img src="../../extras/logo.png" alt="logo" class="logo-img"></a>
+    <span class="title-name">College Sathi_v1</span>
+    </div>
+
+    <ul >
+      <li><a href="#" class="active">𖠿 Home</a></li>
+      <li><a href="#">||-|| Workout</a></li>
+      <li><a href="#">𖠩 Stockpile</a></li>
+      <li><a href="#">☰ To-Do List</a></li>
+      <li><a href="#">🗎 Diet Planner</a></li>
+      <li><a href="about.html"><i>i</i>About</li></a>
+    </ul>
+
+    <ul >
+      <li><a href="#">❀ Themes</a></li>
+      <li><a href="#">⚙︎ Settings</a></li>
+      <li><a href="#">➜] Logout</a></li>
+      <li><a href="#"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR9DLfxwmyzwDsXvQUiMSRfsO-__BeYqU4jLPr_lABMayxb5Iej4yPuAAs&s=10" alt="profile image" class="profile-image">Rahul Upadhyay</a></li>
+    </ul>
+  </nav>
+  <!-- this is the main content -->
+  <main>
+
+    <!-- this is the greeting header -->
+
+<header class="page-header">
+  <h1 class="greet-title">Good evening, Rahul!</h1>
+  <label>
+    <input type="search" placeholder="Search" aria-label="Search" class="search">
+  </label>
+
+  <a href="notifications.html" class="notif-link" aria-label="Notifications">
+    <img src="../../extras/bell.png" alt="" class="notif-logo">
+  </a>
+  <time datetime="2026-11">🗒 Nov 2026</time>
+</header>
+
+<!-- main calender seciton -->
+<div class="dashboard">
+<section class="calendar">
+  <div class="calendar-header">
+    <h2 id="month-title">November 2026</h2>
+    <div>
+      <button type="button" id="prev-month" aria-label="Previous month">&lt;</button>
+      <button type="button" id="next-month" aria-label="Next month">&gt;</button>
+    </div>
+  </div>
+
+  <div class="weekdays">
+    <span>Sun</span>
+    <span>Mon</span>
+    <span>Tue</span>
+    <span>Wed</span>
+    <span>Thu</span>
+    <span>Fri</span>
+    <span>Sat</span>
+  </div>
+
+  <div class="calendar-grid" id="calendar-grid"></div>
+</section>
+
+<!-- this section carries clock and to-dos -->
+<div class="clock-to-do">
+
+  <aside class="pomo-clock">
+    <div class="ring">
+      <svg viewBox="0 0 200 200">
+        <defs>
+          <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff9a8b"/>
+            <stop offset="1" stop-color="#ff5e62"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-track" cx="100" cy="100" r="85"/>
+        <circle class="ring-progress" cx="100" cy="100" r="85"/>
+      </svg>
+      <div class="ring-center">
+        <div class="time" id="timer-display">25:00</div>
+        <div class="ring-buttons">
+          <button type="button" id="timer-toggle" aria-label="Start">▶</button>
+          <button type="button" id="timer-reset" aria-label="Reset">↻</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pomo-footer">
+      <span>Study Session</span>
+      <div class="focus-info">
+        <small>Focus Time</small>
+        <strong>25m</strong>
+      </div>
+    </div>
+  </aside>
+
+  <aside class="todo-list">
+    <h2>Quick To-Do's</h2>
+    <ul>
+      <li>
+        <label>
+          <input type="checkbox">
+          <span class="todo-text">Submit network assignment</span>
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox">
+          <span class="todo-text">Read Chapter 4</span>
+        </label>
+      </li>
+      <li>
+        <label>
+          <input type="checkbox">
+          <span class="todo-text">Meal Prep</span>
+        </label>
+      </li>
+    </ul>
+  </aside>
+</div>
+</div>
+</main>
+</body>
+</html>

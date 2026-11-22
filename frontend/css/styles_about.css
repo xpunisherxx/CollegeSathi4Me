@@ -20,7 +20,7 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;                      
-  background: url("extras/bg.jpeg") center / cover no-repeat;
+  background: url("../../extras/bg.jpeg") center / cover no-repeat;
   filter: blur(20px);               
   transform: scale(1.1);             
 }
@@ -125,12 +125,7 @@ body::after {
 }
 
 
-
-
-
-/* this is where main begins */
-
-
+/* thsi is form where the main starts */
 main {
   flex: 1;
   padding: 24px 32px;
